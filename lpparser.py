@@ -60,7 +60,7 @@ fileNames = {
     'EQDN': 'EquivalentDomains.csv',
     'URUL': 'UrlRules.csv'
 }
-DEBUG = True
+DEBUG = False
 
 def main():
     flags = parse_cmdl()
