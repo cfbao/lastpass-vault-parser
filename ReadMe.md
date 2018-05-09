@@ -68,7 +68,7 @@ See this [LastPass FAQ](https://lastpass.com/support.php?cmd=showfaq&id=425) on 
 #### Option 3: LastPass's built-in encrypted export (NOT recommended)
 Use any binary installation of LastPass (extension with binary component, LastPass Pocket, etc.) to export an encrypted copy of your vault, which is your vault file.
 
-LastPass's built-in encrypted export contains more information than the plaintext CVS export, but still significantly less information than the first two options. The exported vault format is also slightly different, hence there may be minor parsing errors.
+LastPass's built-in encrypted export contains more information than the plaintext CSV export, but still significantly less information than the first two options. The exported vault format is also slightly different, hence there may be minor parsing errors.
 
 ### What is my password iterations?
 Typically, you only need to manually enter your password iterations when your vault file is obtained via Option 2.
