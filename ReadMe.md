@@ -52,7 +52,7 @@ By not entering your master password, you can see what is unencrypted, and make 
 ### What is "vault file" and how do I find/get it?
 
 #### Option 1: Chrome extension database (_Recommended_)
-Use the LastPass extension for Chrome, and the extension database file is your vault file.
+Use the LastPass extension for Chrome *without the binary component*, and the extension database file is your vault file.
 See this [LastPass FAQ](https://lastpass.com/support.php?cmd=showfaq&id=425) on locating your Chrome extension database.
 
 #### Option 2: Browser network log
