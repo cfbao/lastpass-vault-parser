@@ -52,7 +52,7 @@ By not entering your master password, you can see what is unencrypted, and make 
 ### What is "vault file" and how do I find/get it?
 
 #### Option 1: Chrome extension database (_Recommended_)
-Use the LastPass extension for Chrome *without the binary component*, and the extension database file is your vault file.
+Use the LastPass extension for Chrome, and the extension database file is your vault file.
 See this [LastPass FAQ](https://lastpass.com/support.php?cmd=showfaq&id=425) on locating your Chrome extension database.
 
 #### Option 2: Browser network log
@@ -71,7 +71,7 @@ Use any binary installation of LastPass (extension with binary component, LastPa
 LastPass's built-in encrypted export contains more information than the plaintext CSV export, but still significantly less information than the first two options. The exported vault format is also slightly different, hence there may be minor parsing errors.
 
 ### What is my password iterations?
-Typically, you only need to manually enter your password iterations when your vault file is obtained via Option 2.
+Typically, you're only asked to manually enter your password iterations when your vault file is obtained via Option 2.
 In this case, you can check your password iterations by searching for "iterations.php" in the same network log.
 
 Alternatively, you can check it via the normal LastPass web interface:  
