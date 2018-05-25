@@ -353,8 +353,8 @@ def aes_decrypt_lpbin_soft(ivData, key, raiseCond=None, terminateCond=None):
         if e.args[0] in terminateCond:
             fail('ERROR: corrupted vault', 1)
         if e.args[0] != 'format':
-            res = '!' + b2a_base64(ivData[:16]).decode('utf-8').strip() \
-                + '|' + b2a_base64(ivData[16:]).decode('utf-8').strip()
+            res = '!' + b2a_base64(ivData[1:17]).decode('utf-8').strip() \
+                + '|' + b2a_base64(ivData[17:]).decode('utf-8').strip()
         else:
             res = ivData.hex()
     return res
