@@ -122,8 +122,7 @@ def read_from_db(path, email):
     if res:
         return res[0]
     else:
-        print("ERROR: vault not found in database", file=sys.stderr)
-        sys.exit(1)
+        fail("ERROR: vault not found in database", 1)
 
 def pre_dec_vault(vaultAsc, key):
     try:
@@ -132,14 +131,13 @@ def pre_dec_vault(vaultAsc, key):
         if e.args[0] == 'format':
             pass
         else:
-            print('Error: failed to decrypt the vault')
-            sys.exit(1)
+            fail('Error: failed to decrypt the vault', 1)
     if vaultAsc.startswith('LPB64'):
         vaultAsc = vaultAsc[5:]
     try:
         vaultBin = a2b_base64(vaultAsc)
     except binascii.Error:
-        print('Error: failed to decode the vault')
+        fail('Error: failed to decrypt the vault', 1)
     return vaultBin
 
 def parse_vault_bin(vault, key):
@@ -151,7 +149,7 @@ def parse_vault_bin(vault, key):
     while pos < len(vault):
         match = regex.match(vault[pos:])
         if not match:
-            corrupted()
+            fail('ERROR: corrupted vault', 1)
         code = match[0].decode('utf-8')
         pos += 4
         chunk, pos = read_chunk(vault, pos)
@@ -230,7 +228,7 @@ def parse_generic(chunk, key, headers, prepend=None, append=None, hexFields=None
             try:
                 record[field] = bytes.fromhex(record[field]).decode('utf-8')
             except ValueError:
-                corrupted()
+                fail('ERROR: corrupted vault', 1)
     return record
 
 def parse_shar(chunk, key):
@@ -266,7 +264,7 @@ def decrypt_or_decode(data, key):
         try:
             dataDec = data.decode('utf-8')
         except ValueError:
-            corrupted()
+            fail('ERROR: corrupted vault', 1)
     return dataDec
 
 def get_attach_key(attachKeyHexEncB64, key):
@@ -281,7 +279,7 @@ def get_attach_key(attachKeyHexEncB64, key):
         assert e.args[0] in ('unicode', 'padding')
         return None, attachKeyHexEncB64
     except UnicodeDecodeError:
-        corrupted()
+        fail('ERROR: corrupted vault', 1)
 
 def read_chunks(data):
     pos = 0
@@ -295,11 +293,11 @@ def read_chunk(data, start=0):
     try:
         size = struct.unpack('>I', data[start:start+4])[0]
     except struct.error:
-        corrupted()
+        fail('ERROR: corrupted vault', 1)
     start += 4
     data = data[start:start+size]
     if len(data) != size:
-        corrupted()
+        fail('ERROR: corrupted vault', 1)
     return data, start+size
 
 def request_filepath(path, msg, makenew=False):
@@ -353,7 +351,7 @@ def aes_decrypt_lpbin_soft(ivData, key, raiseCond=None, terminateCond=None):
         if e.args[0] in raiseCond:
             raise e
         if e.args[0] in terminateCond:
-            corrupted()
+            fail('ERROR: corrupted vault', 1)
         if e.args[0] != 'format':
             res = '!' + b2a_base64(ivData[:16]).decode('utf-8').strip() \
                 + '|' + b2a_base64(ivData[16:]).decode('utf-8').strip()
@@ -377,7 +375,7 @@ def aes_decrypt_lpb64_soft(ivData, key, raiseCond=None, terminateCond=None):
         if e.args[0] in raiseCond:
             raise e
         if e.args[0] in terminateCond:
-            corrupted()
+            fail('ERROR: corrupted vault', 1)
         res = ivData
     return res
 
@@ -431,7 +429,7 @@ def sha256(data):
 
 def validate(a, b):
     if a == b: return
-    corrupted()
+    fail('ERROR: corrupted vault', 1)
 
 def input_int(msg, errMsg, validator=None):
     while True:
@@ -445,12 +443,13 @@ def input_int(msg, errMsg, validator=None):
         if errMsg:
             print(errMsg)
 
-def corrupted():
+def fail(msg, errCode):
+    print(msg, file=sys.stderr)
     if DEBUG:
         raise RuntimeError
     else:
-        print('ERROR: corrupted vault', file=sys.stderr)
-        sys.exit(1)
+        input('press ENTER to exit')
+        sys.exit(errCode)
 
 if __name__ == '__main__':
     try:
