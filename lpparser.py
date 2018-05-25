@@ -126,7 +126,7 @@ def read_from_db(path, email):
 
 def pre_dec_vault(vaultAsc, key):
     try:
-        vaultAsc = aes_decrypt_lpb64_soft(vaultAsc, key, raiseCond=('format','padding','unicode'))
+        vaultAsc = aes_decrypt_soft(vaultAsc, key, raiseCond=('format','padding','unicode'))
     except LpDecryptionError as e:
         if e.args[0] == 'format':
             pass
@@ -187,7 +187,7 @@ def parse_vault_bin(vault, key):
         elif code == 'ATTA':
             record = parse_generic(chunk, attachKey if attachKey else key, recordFields[code])
             if attachKey:
-                record['filename'] = aes_decrypt_lpb64_soft(record['filename'], attachKey)
+                record['filename'] = aes_decrypt_soft(record['filename'], attachKey)
             vaultDict[code].append(record)
         elif code == 'EQDN':
             record = parse_generic(chunk, key, recordFields[code], hexFields=('domain',))
@@ -240,11 +240,11 @@ def parse_shar(chunk, key):
     pos = read_chunk(chunk, pos)[1]
     shareKeyHexEnc, pos = read_chunk(chunk, pos)
     try:
-        shareKeyHex = aes_decrypt_lpbin(shareKeyHexEnc, key)
+        shareKeyHex = aes_decrypt_soft(shareKeyHexEnc, key, raiseCond=('format', 'padding', 'unicode'))
     except LpDecryptionError:
         return None, None
     shareKey = bytes.fromhex(shareKeyHex)
-    name = aes_decrypt_lpb64_soft(nameEnc.decode('utf-8'), shareKey, terminateCond=('format',))
+    name = aes_decrypt_soft(nameEnc.decode('utf-8'), shareKey, terminateCond=('format',))
     return shareKey, name
 
 def export_to_csv(vaultSec, headers, dir, filename):
@@ -257,13 +257,12 @@ def export_to_csv(vaultSec, headers, dir, filename):
 
 def decrypt_or_decode(data, key):
     try:
-        dataDec = aes_decrypt_lpbin_soft(data, key, raiseCond=('format',))
-    except LpDecryptionError as e:
-        # data doen't conform to the format of binary encrypted data, pass to decode as string instead
-        assert e.args[0] == 'format'
+        dataDec = data.decode('utf-8')
+    except UnicodeDecodeError:
         try:
-            dataDec = data.decode('utf-8')
-        except ValueError:
+            dataDec = aes_decrypt_soft(data, key, raiseCond=('format',))
+        except LpDecryptionError as e:
+            assert e.args[0] == 'format'
             fail('ERROR: corrupted vault', 1)
     return dataDec
 
@@ -271,7 +270,7 @@ def get_attach_key(attachKeyHexEncB64, key):
     if not attachKeyHexEncB64:
         return None, ''
     try:
-        attachKeyHex = aes_decrypt_lpb64_soft(attachKeyHexEncB64, key, 
+        attachKeyHex = aes_decrypt_soft(attachKeyHexEncB64, key, 
             raiseCond=('unicode', 'padding'), terminateCond=('format',))
         attachKey = bytes.fromhex(attachKeyHex)
         return attachKey, attachKeyHex
@@ -335,72 +334,87 @@ def p2k(salt, password, iterations):
         backend=backend
     ).derive(password)
 
-def aes_decrypt_lpbin_soft(ivData, key, raiseCond=None, terminateCond=None):
-    """By default, decrypt binary data in standard LP storage form. 
-    If decryption fails, return the base64 or hex representation of the original binary data
+def aes_decrypt_soft(dataRaw, key, raiseCond=None, terminateCond=None):
+    """Decrypt data in standard LP storage form. 
+    By default, if decryption fails and dataRaw conforms to standard LP encrypted data format, 
+        return the base64 representation of the original data.
+    if decryption fails and dataRaw does not conform to standard form,
+        return the hex representation of the original data.
+    Specify the following two parameters to change the default soft exit:
     riaseCond:      List of LpDecryptionError messages that would cause the exception to be raised
     terminateCond:  List of LpDecryptionError messages that would cause termination of script
     """
-    if not ivData:
+    if not dataRaw:
         return ''
     raiseCond = raiseCond if raiseCond else tuple()
     terminateCond = terminateCond if terminateCond else tuple()
     try:
-        res = aes_decrypt_lpbin(ivData, key)
+        dataEnc, mode = format_enc_data(dataRaw)
+        res = aes_decrypt_str(dataEnc, key, mode)
     except LpDecryptionError as e:
         if e.args[0] in raiseCond:
             raise e
         if e.args[0] in terminateCond:
             fail('ERROR: corrupted vault', 1)
         if e.args[0] != 'format':
-            res = '!' + b2a_base64(ivData[1:17]).decode('utf-8').strip() \
-                + '|' + b2a_base64(ivData[17:]).decode('utf-8').strip()
+            if mode.name == 'CBC':
+                res = '!' + b2a_base64(mode.initialization_vector).decode('utf-8').strip() \
+                    + '|' + b2a_base64(dataEnc).decode('utf-8').strip()
+            elif mode.name == 'ECB':
+                res = b2a_base64(dataEnc).decode('utf-8').strip()
+            else:
+                fail('ERROR: Impossible scenario!!! Contact developer!', 999)
         else:
-            res = ivData.hex()
+            res = dataRaw.hex()
     return res
 
-def aes_decrypt_lpb64_soft(ivData, key, raiseCond=None, terminateCond=None):
-    """By default, decrypt base64 encoded data in standard LP storage form. 
-    If decryption fails, return the original string
-    riaseCond:      List of LpDecryptionError messages that would cause the exception to be raised
-    terminateCond:  List of LpDecryptionError messages that would cause termination of script
-    """
-    if not ivData:
-        return ''
-    raiseCond = raiseCond if raiseCond else tuple()
-    terminateCond = terminateCond if terminateCond else tuple()
+def format_enc_data(dataRaw):
     try:
-        res = aes_decrypt_lpb64(ivData, key)
-    except LpDecryptionError as e:
-        if e.args[0] in raiseCond:
-            raise e
-        if e.args[0] in terminateCond:
-            fail('ERROR: corrupted vault', 1)
-        res = ivData
-    return res
+        memoryview(dataRaw)
+    except TypeError:
+        try:
+            getattr(dataRaw, 'encode') and getattr(dataRaw, 'capitalize')
+        except AttributeError:
+            raise TypeError('ERROR: Encrypted data must be either str or bytes')
+        else:
+            dataType = 'b64'
+    else:
+        dataType = 'bytes'
+    if dataType == 'b64':
+        if dataRaw[0] == '!' and dataRaw[25] == '|':
+        # CBC candidate
+            ivB64, dataEncB64 = dataRaw[1:25], dataRaw[26:]
+            try:
+                iv = a2b_base64(ivB64)
+                dataEnc = a2b_base64(dataEncB64)
+            except binascii.Error:
+                raise LpDecryptionError('format')
+            if len(iv) != 16 or len(dataEnc) % 16 !=0:
+                raise LpDecryptionError('format')
+            return dataEnc, modes.CBC(iv)
+        else:
+        # ECB candidate
+            try:
+                dataEnc = a2b_base64(dataRaw)
+            except binascii.Error:
+                raise LpDecryptionError('format')
+            if len(dataEnc) % 16 != 0:
+                raise LpDecryptionError('format')
+            return dataEnc, modes.ECB()
+    else:
+        lenMod = len(dataRaw) % 16
+        if lenMod == 1 and dataRaw[0:1] == b'!':
+            iv = dataRaw[1:17]
+            dataEnc = dataRaw[17:]
+            return dataEnc, modes.CBC(iv)
+        elif lenMod == 0:
+            return dataRaw, modes.ECB()
+        else:
+            raise LpDecryptionError('format')
 
-def aes_decrypt_lpbin(ivData, key):
-    if len(ivData) < 33 or len(ivData) % 16 != 1 or ivData[0:1] != b'!':
-        raise LpDecryptionError('format')
-    iv, data = ivData[1:17], ivData[17:]
-    return aes_decrypt_str(data, iv, key)
-
-def aes_decrypt_lpb64(ivData, key):
-    if ivData[0] != '!' or ivData[25] != '|':
-        raise LpDecryptionError('format')
-    iv, data = ivData[1:25], ivData[26:]
+def aes_decrypt_str(textEnc, key, mode):
     try:
-        iv = a2b_base64(iv)
-        data = a2b_base64(data)
-    except binascii.Error:
-        raise LpDecryptionError('format')
-    if len(iv) != 16 or len(data) % 16 !=0:
-        raise LpDecryptionError('format')
-    return aes_decrypt_str(data, iv, key)
-
-def aes_decrypt_str(data, iv, key):
-    try:
-        data = aes_decrypt_byte(data, key, iv).decode('utf-8')
+        text = aes_decrypt_raw(textEnc, key, mode).decode('utf-8')
     except UnicodeDecodeError:
         raise LpDecryptionError('unicode')
     except ValueError as e:
@@ -408,15 +422,10 @@ def aes_decrypt_str(data, iv, key):
             raise e
         raise LpDecryptionError('padding')
     else:
-        return data
+        return text
 
-def aes_decrypt_byte(ciphertext, key, iv=None, mode=None):
-    if mode is None:
-        if iv is None:
-            raise ValueError('iv must be provided in CBC (default) mode')
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
-    else:
-        cipher = Cipher(algorithms.AES(key), mode, backend=backend)
+def aes_decrypt_raw(ciphertext, key, mode):
+    cipher = Cipher(algorithms.AES(key), mode, backend=backend)
     decryptor = cipher.decryptor()
     unpadder = padding.PKCS7(128).unpadder()
     plaintext = decryptor.update(ciphertext)+decryptor.finalize()
@@ -443,7 +452,7 @@ def input_int(msg, errMsg, validator=None):
         if errMsg:
             print(errMsg)
 
-def fail(msg, errCode):
+def fail(msg, errCode=1):
     print(msg, file=sys.stderr)
     if DEBUG:
         raise RuntimeError
