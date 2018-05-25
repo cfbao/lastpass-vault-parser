@@ -24,7 +24,7 @@ Depending on the availability of relevant data in your vault, the following CSV 
 To use the Python script directly:
 * Python 3.6+
 * package *cryptography*  
-run `pip install --upgrade cryptography` to install
+run `pip install cryptography` to install
 
 To use the Windows binary (download on the [releases](https://github.com/cfbao/lastpass-vault-parser/releases) page)
 * on Windows 7: Windows update [KB2999226](https://support.microsoft.com/en-gb/help/2999226/update-for-universal-c-runtime-in-windows "Update for Universal C Runtime in Windows") (should have already be installed on an up-to-date system)
@@ -33,17 +33,20 @@ To use the Windows binary (download on the [releases](https://github.com/cfbao/l
 
 ## How-to
 
-Download `lpparser` ([.py](https://raw.githubusercontent.com/cfbao/lastpass-vault-parser/v0.1.1/lpparser.py) or
-[.exe](https://github.com/cfbao/lastpass-vault-parser/releases/download/v0.1.1/lpparser.exe)), and run it directly.
+Download `lpparser` ([.py](https://raw.githubusercontent.com/cfbao/lastpass-vault-parser/v0.2.0/lpparser.py) or
+[.exe](https://github.com/cfbao/lastpass-vault-parser/releases/download/v0.2.0/lpparser.exe)), and run it directly.
 It will prompt you to enter the path of your vault file, path of the output directory, LastPass account e-mail, (potentially) password iterations, and master password.
 `lpparser` works 100% locally and makes absolutely no use of Internet connections.
 
 Ideally, the output directory should be a new or empty directory residing on an encrypted drive or a RAM disk. Sensitive data should never be saved on disk unencrypted.
 
 You may opt to not enter your master password. Then any encrypted data would be exported in the format of  
-`!<initialization-vector-b64encoded>|<AES-CBC-encrypted-blob-b64encoded>`  
+`!<initialization-vector-b64encoded>|<AES-CBC-encrypted-blob-b64encoded>`, or  
+`<AES-ECB-encrypted-blob-b64encoded>`
+
 It should look something like  
-`!ztYeRZRUvd/nRq9IuNn8ug==|G7ikJAmh/maa+PR3sQg+NL8ixNR0LKr73/xfKU6wV6Q=`
+`!ztYeRZRUvd/nRq9IuNn8ug==|G7ikJAmh/maa+PR3sQg+NL8ixNR0LKr73/xfKU6wV6Q=`, or  
+`F3TQMseR/by+2fMJmgIJjjF+2QLmWXsHLeO4Z3Fd5OY=`
 
 **LastPass does not encrypt everything in your vault.**
 By not entering your master password, you can see what is unencrypted, and make sure no private data is unintentionally leaked.
