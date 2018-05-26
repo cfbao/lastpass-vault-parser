@@ -82,3 +82,6 @@ Alternatively, you can check it via the normal LastPass web interface:
 
 Occasionally, if your vault file is obtained via Option 1, the password iterations included with the vault file may be incorrect.
 You can override this incorrect value manually by using the command line option `--iterations #`.
+
+### LastPass Vault Format
+An (incomplete) unofficial description of the LastPass vault format is included in the repository so people can more easily parse their own vault without third party tools. It can be found [here](/lastpass-vault-format.md).
