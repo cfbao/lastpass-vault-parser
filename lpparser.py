@@ -305,8 +305,13 @@ def request_filepath(path, msg, makenew=False):
         if not path:
             path = input(msg).strip().strip('"')
         if makenew:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            return path
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+            except OSError as e:
+                print(e.strerror)
+                path = None
+            else:
+                return path
         elif os.path.isfile(path):
             return path
         else:
@@ -318,8 +323,13 @@ def request_dirpath(path, msg, makenew=False):
         if not path:
             path = input(msg).strip().strip('"')
         if makenew:
-            os.makedirs(path, exist_ok=True)
-            return path
+            try:
+                os.makedirs(path, exist_ok=True)
+            except OSError as e:
+                print(e.strerror)
+                path = None
+            else:
+                return path
         elif os.path.isdir(path):
             return path
         else:
