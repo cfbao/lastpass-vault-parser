@@ -272,13 +272,14 @@ def get_attach_key(attachKeyHexEncB64, key):
     try:
         attachKeyHex = aes_decrypt_soft(attachKeyHexEncB64, key, 
             raiseCond=('unicode', 'padding'), terminateCond=('format',))
-        attachKey = bytes.fromhex(attachKeyHex)
-        return attachKey, attachKeyHex
     except LpDecryptionError as e:
         assert e.args[0] in ('unicode', 'padding')
         return None, attachKeyHexEncB64
-    except UnicodeDecodeError:
+    try:
+        attachKey = bytes.fromhex(attachKeyHex)
+    except ValueError:
         fail('ERROR: corrupted vault', 1)
+    return attachKey, attachKeyHex
 
 def read_chunks(data):
     pos = 0
@@ -435,10 +436,6 @@ def sha256(data):
     digest = hashes.Hash(hashes.SHA256(), backend=backend)
     digest.update(data)
     return digest.finalize()
-
-def validate(a, b):
-    if a == b: return
-    fail('ERROR: corrupted vault', 1)
 
 def input_int(msg, errMsg, validator=None):
     while True:
