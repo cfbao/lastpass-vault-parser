@@ -24,7 +24,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import asymmetric
-backend = default_backend()
 recordFields = {
     'ACCT': ('aid', 'Name', 'Folder', 'URL', 'Notes', 'Favorite', 'sharedfromaid', 'Username', 'Password', 
         'Require Password Repromt', 'Generated Password', 'Secure Notes', 'Last Used', 'AutoLogin', 'Disable AutoFill', 'realm_data', 'fiid', 
@@ -60,32 +59,53 @@ fileNames = {
     'EQDN': 'EquivalentDomains.csv',
     'URUL': 'UrlRules.csv'
 }
-DEBUG = False
+VAULT_CORRUPT = (1, 'ERROR: corrupted vault')
+VAULT_NOT_IN_DB = (2, 'ERROR: vault not found in database')
+VAULT_DECRYPT_FAIL = (3, 'Error: failed to decrypt the vault')
+_IMPOSSIBLE = (999, 'ERROR: Impossible scenario!!! Contact the developer!')
+_DEBUG = False
+_backend = default_backend()
 
-def main():
-    flags = parse_cmdl()
-    vaultAsc, iterations = read_vault_from_file(flags.input, flags.user, flags.iterations)
-    passwordBin = getpass.getpass().encode('utf-8')
-    key = p2k(flags.user.encode('utf-8'), passwordBin, iterations)
-    vaultBin = pre_dec_vault(vaultAsc, key)
-    vaultDict = parse_vault_bin(vaultBin, key)
+def main(argv=None):
+    flags = parse_cmdl(argv)
+    try:
+        vaultAsc, iterations = read_vault_from_file(flags.input, flags.user, flags.iterations)
+        passwordBin = getpass.getpass().encode('utf-8')
+        key = p2k(flags.user.encode('utf-8'), passwordBin, iterations)
+        vaultBin = pre_dec_vault(vaultAsc, key)
+        vaultDict = parse_vault_bin(vaultBin, key)
+    except LpParserFail as e:
+        print(e.msg, file=sys.stderr)
+        if _DEBUG:
+            raise e
+        else:
+            if not flags.nopause:
+                input('\npress ENTER to exit')
+            return e.errCode
     for code in recordFields:
         if vaultDict.get(code) and fileNames.get(code):
             export_to_csv(vaultDict[code], recordFields[code], flags.outdir, fileNames[code])
     print()
     print('Data exported to {}'.format(os.path.abspath(flags.outdir)))
-    input('Press ENTER to exit')
+    if not flags.nopause:
+        input('\npress ENTER to exit')
 
 class LpDecryptionError(Exception):
     pass
 
-def parse_cmdl():
+class LpParserFail(Exception):
+    def __init__(self, errCode, msg):
+        self.errCode = 1 if errCode is None else int(errCode)
+        self.msg = 'ERROR' if msg is None else str(msg)
+
+def parse_cmdl(argv=None):
     parser = argparse.ArgumentParser(description='Export information from LastPass vault')
     parser.add_argument('-i', '--input', action='store', metavar='DB', help='Path of LastPass vault file.')
     parser.add_argument('-o', '--outdir', action='store', metavar='DIR', help='Output directory')
     parser.add_argument('-u', '--user', action='store', metavar='EMAIL', help='User email')
     parser.add_argument('--iterations', action='store', metavar='#', type=int, help='Password iterations.')
-    flags = parser.parse_args()
+    parser.add_argument('--nopause', action='store_true', help='No pause upon exiting the script.')
+    flags = parser.parse_args(argv)
     flags.input = request_filepath(flags.input, 'Path of LastPass vault file: ')
     flags.outdir = request_dirpath(flags.outdir, 'Output directory: ', makenew=True)
     if not flags.outdir.endswith(os.sep):
@@ -122,7 +142,7 @@ def read_from_db(path, email):
     if res:
         return res[0]
     else:
-        fail("ERROR: vault not found in database", 1)
+        raise LpParserFail(*VAULT_NOT_IN_DB)
 
 def pre_dec_vault(vaultAsc, key):
     try:
@@ -131,13 +151,13 @@ def pre_dec_vault(vaultAsc, key):
         if e.args[0] == 'format':
             pass
         else:
-            fail('Error: failed to decrypt the vault', 1)
+            raise LpParserFail(*VAULT_DECRYPT_FAIL)
     if vaultAsc.startswith('LPB64'):
         vaultAsc = vaultAsc[5:]
     try:
         vaultBin = a2b_base64(vaultAsc)
     except binascii.Error:
-        fail('Error: failed to decrypt the vault', 1)
+        raise LpParserFail(*VAULT_DECRYPT_FAIL)
     return vaultBin
 
 def parse_vault_bin(vault, key):
@@ -149,7 +169,7 @@ def parse_vault_bin(vault, key):
     while pos < len(vault):
         match = regex.match(vault[pos:])
         if not match:
-            fail('ERROR: corrupted vault', 1)
+            raise LpParserFail(*VAULT_CORRUPT)
         code = match[0].decode('utf-8')
         pos += 4
         chunk, pos = read_chunk(vault, pos)
@@ -228,7 +248,7 @@ def parse_generic(chunk, key, headers, prepend=None, append=None, hexFields=None
             try:
                 record[field] = bytes.fromhex(record[field]).decode('utf-8')
             except ValueError:
-                fail('ERROR: corrupted vault', 1)
+                raise LpParserFail(*VAULT_CORRUPT)
     return record
 
 def parse_shar(chunk, key):
@@ -263,7 +283,7 @@ def decrypt_or_decode(data, key):
             dataDec = aes_decrypt_soft(data, key, raiseCond=('format',))
         except LpDecryptionError as e:
             assert e.args[0] == 'format'
-            fail('ERROR: corrupted vault', 1)
+            raise LpParserFail(*VAULT_CORRUPT)
     return dataDec
 
 def get_attach_key(attachKeyHexEncB64, key):
@@ -278,7 +298,7 @@ def get_attach_key(attachKeyHexEncB64, key):
     try:
         attachKey = bytes.fromhex(attachKeyHex)
     except ValueError:
-        fail('ERROR: corrupted vault', 1)
+        raise LpParserFail(*VAULT_CORRUPT)
     return attachKey, attachKeyHex
 
 def read_chunks(data):
@@ -293,11 +313,11 @@ def read_chunk(data, start=0):
     try:
         size = struct.unpack('>I', data[start:start+4])[0]
     except struct.error:
-        fail('ERROR: corrupted vault', 1)
+        raise LpParserFail(*VAULT_CORRUPT)
     start += 4
     data = data[start:start+size]
     if len(data) != size:
-        fail('ERROR: corrupted vault', 1)
+        raise LpParserFail(*VAULT_CORRUPT)
     return data, start+size
 
 def request_filepath(path, msg, makenew=False):
@@ -342,7 +362,7 @@ def p2k(salt, password, iterations):
         length=32,
         salt=salt,
         iterations=iterations,
-        backend=backend
+        backend=_backend
     ).derive(password)
 
 def aes_decrypt_soft(dataRaw, key, raiseCond=None, terminateCond=None):
@@ -366,7 +386,7 @@ def aes_decrypt_soft(dataRaw, key, raiseCond=None, terminateCond=None):
         if e.args[0] in raiseCond:
             raise e
         if e.args[0] in terminateCond:
-            fail('ERROR: corrupted vault', 1)
+            raise LpParserFail(*VAULT_CORRUPT)
         if e.args[0] != 'format':
             if mode.name == 'CBC':
                 res = '!' + b2a_base64(mode.initialization_vector).decode('utf-8').strip() \
@@ -374,7 +394,7 @@ def aes_decrypt_soft(dataRaw, key, raiseCond=None, terminateCond=None):
             elif mode.name == 'ECB':
                 res = b2a_base64(dataEnc).decode('utf-8').strip()
             else:
-                fail('ERROR: Impossible scenario!!! Contact developer!', 999)
+                raise LpParserFail(*_IMPOSSIBLE)
         else:
             res = dataRaw.hex()
     return res
@@ -441,14 +461,14 @@ def aes_decrypt_str(textEnc, key, mode):
         return text
 
 def aes_decrypt_raw(ciphertext, key, mode):
-    cipher = Cipher(algorithms.AES(key), mode, backend=backend)
+    cipher = Cipher(algorithms.AES(key), mode, backend=_backend)
     decryptor = cipher.decryptor()
     unpadder = padding.PKCS7(128).unpadder()
     plaintext = decryptor.update(ciphertext)+decryptor.finalize()
     return unpadder.update(plaintext) + unpadder.finalize()
 
 def sha256(data):
-    digest = hashes.Hash(hashes.SHA256(), backend=backend)
+    digest = hashes.Hash(hashes.SHA256(), backend=_backend)
     digest.update(data)
     return digest.finalize()
 
@@ -464,16 +484,8 @@ def input_int(msg, errMsg, validator=None):
         if errMsg:
             print(errMsg)
 
-def fail(msg, errCode=1):
-    print(msg, file=sys.stderr)
-    if DEBUG:
-        raise RuntimeError
-    else:
-        input('press ENTER to exit')
-        sys.exit(errCode)
-
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         print()
