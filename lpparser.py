@@ -244,7 +244,7 @@ def parse_shar(chunk, key):
     except LpDecryptionError:
         return None, None
     shareKey = bytes.fromhex(shareKeyHex)
-    name = aes_decrypt_soft(nameEnc.decode('utf-8'), shareKey, terminateCond=('format',))
+    name = aes_decrypt_soft(nameEnc, shareKey, terminateCond=('format',))
     return shareKey, name
 
 def export_to_csv(vaultSec, headers, dir, filename):
@@ -390,7 +390,12 @@ def format_enc_data(dataRaw):
         else:
             dataType = 'b64'
     else:
-        dataType = 'bytes'
+        try:
+            dataRaw = dataRaw.decode('utf-8')
+        except UnicodeDecodeError:
+            dataType = 'bytes'
+        else:
+            dataType = 'b64'
     if dataType == 'b64':
         if dataRaw[0] == '!' and dataRaw[25] == '|':
         # CBC candidate
