@@ -33,8 +33,8 @@ To use the Windows binary (download on the [releases](https://github.com/cfbao/l
 
 ## How-to
 
-Download `lpparser` ([.py](https://raw.githubusercontent.com/cfbao/lastpass-vault-parser/v0.2.0/lpparser.py) or
-[.exe](https://github.com/cfbao/lastpass-vault-parser/releases/download/v0.2.0/lpparser.exe)), and run it directly.
+Download `lpparser` ([.py](https://raw.githubusercontent.com/cfbao/lastpass-vault-parser/v0.2.1/lpparser.py) or
+[.exe](https://github.com/cfbao/lastpass-vault-parser/releases/download/v0.2.1/lpparser.exe)), and run it directly.
 It will prompt you to enter the path of your vault file, path of the output directory, LastPass account e-mail, (potentially) password iterations, and master password.
 `lpparser` works 100% locally and makes absolutely no use of Internet connections.
 
