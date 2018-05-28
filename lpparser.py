@@ -146,12 +146,18 @@ def read_from_db(path, email):
 
 def pre_dec_vault(vaultAsc, key):
     try:
-        vaultAsc = aes_decrypt_soft(vaultAsc, key, raiseCond=('format','padding','unicode'))
+        vaultEnc, mode = format_enc_data(vaultAsc)
     except LpDecryptionError as e:
-        if e.args[0] == 'format':
-            pass
+        assert e.args[0] == 'format'
+        pass
+    else:
+        if mode.name == 'CBC':
+            try:
+                vaultAsc = aes_decrypt_str(vaultEnc, key, mode)
+            except LpDecryptionError:
+                raise LpParserFail(*VAULT_DECRYPT_FAIL)
         else:
-            raise LpParserFail(*VAULT_DECRYPT_FAIL)
+            del vaultEnc
     if vaultAsc.startswith('LPB64'):
         vaultAsc = vaultAsc[5:]
     try:
