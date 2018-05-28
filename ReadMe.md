@@ -27,8 +27,8 @@ To use the Python script directly:
 run `pip install cryptography` to install
 
 To use the Windows binary (download on the [releases](https://github.com/cfbao/lastpass-vault-parser/releases) page)
-* on Windows 7: Windows update [KB2999226](https://support.microsoft.com/en-gb/help/2999226/update-for-universal-c-runtime-in-windows "Update for Universal C Runtime in Windows") (should have already be installed on an up-to-date system)
-* on Windows 8+: None.
+* on Windows 7/8/8.1: Windows update [KB2999226](https://support.microsoft.com/en-gb/help/2999226/update-for-universal-c-runtime-in-windows "Update for Universal C Runtime in Windows") (should have already be installed on an up-to-date system)
+* on Windows 10: None.
 
 
 ## How-to
