@@ -84,4 +84,4 @@ Occasionally, if your vault file is obtained via Option 1, the password iteratio
 You can override this incorrect value manually by using the command line option `--iterations #`.
 
 ### LastPass Vault Format
-An (incomplete) unofficial description of the LastPass vault format is included in the repository so people can more easily parse their own vault without third party tools. It can be found [here](/lastpass-vault-format.md).
+An (incomplete) unofficial description of the LastPass vault format is included in the repository so people can more easily parse their own vault without third party tools. It can be found [here](/lastpass-vault-format.md) or in the [Wiki](https://github.com/cfbao/lastpass-vault-parser/wiki/LastPass-Vault-Format).
