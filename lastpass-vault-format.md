@@ -112,7 +112,7 @@ Idx | Field Name        | Description
 26  | _attachkey_         | Encryption key for attachments (encrypted)
 27  | attachpresent     | Attachments present (0/1)
 28  | individualshare   | Is individually shared (as opposed to in a shared folder) (0/1)
-29  | notetype          | Note type (Generic / Bank Account / Custom etc.)
+29  | notetype          | The type of the note (Generic / Bank Account / Custom etc.)
 30  | noalert           | (0/1)
 31  | last_modified_gmt | Last modified (UNIX timestamp)
 32  | hasbeenshared     | Shared with others (0/1)
