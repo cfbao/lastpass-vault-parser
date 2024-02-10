@@ -7,6 +7,7 @@
 # along with this program; if not, see <http://www.gnu.org/licenses>.
 
 import argparse
+import itertools
 import os
 import struct
 import csv
@@ -66,29 +67,58 @@ _IMPOSSIBLE = (999, 'ERROR: Impossible scenario!!! Contact the developer!')
 _DEBUG = False
 _backend = default_backend()
 
+
+def get_possible_passwords() -> list:
+    # TODO: Add your own possible parts, or modify the function completely
+    possible_password_parts = [
+    ]
+    possible_passwords = []
+    # password is one to all possible combinations of the possible_password_parts
+    for i in range(1, len(possible_password_parts) + 1):
+        possible_passwords.extend([''.join(x) for x in itertools.permutations(possible_password_parts, i)])
+    return possible_passwords
+
+
 def main(argv=None):
-    flags = parse_cmdl(argv)
-    try:
-        vaultAsc, iterations = read_vault_from_file(flags.input, flags.user, flags.iterations)
-        passwordBin = getpass.getpass().encode('utf-8')
-        key = p2k(flags.user.encode('utf-8'), passwordBin, iterations)
-        vaultBin = pre_dec_vault(vaultAsc, key)
-        vaultDict = parse_vault_bin(vaultBin, key)
-    except LpParserFail as e:
-        print(e.msg, file=sys.stderr)
-        if _DEBUG:
-            raise e
-        else:
-            if not flags.nopause:
-                input('\npress ENTER to exit')
-            return e.errCode
+    vault_path = 'PATH_TO_VAULT'
+    email = 'YOUR_LASTPASS_EMAIL_ADDRESS'
+    iterations = None
+    output_dir = 'output'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    passwords_to_test = get_possible_passwords()
+    print('Testing {} passwords'.format(len(passwords_to_test)))
+    vaultAsc, iterations = read_vault_from_file(vault_path, email, iterations)
+    wrong_password = 'test'.encode('utf-8')
+    wrong_key = p2k(email.encode('utf-8'), wrong_password, iterations)
+    vaultBinWrong = pre_dec_vault(vaultAsc, wrong_key)
+    vaultDictWrong = parse_vault_bin(vaultBinWrong, wrong_key)
+    for password in passwords_to_test:
+        try:
+            vaultAsc, iterations = read_vault_from_file(vault_path, email, iterations)
+            print('testing password:', password)
+            passwordBin = password.encode('utf-8')
+            key = p2k(email.encode('utf-8'), passwordBin, iterations)
+            vaultBin = pre_dec_vault(vaultAsc, key)
+            vaultDict = parse_vault_bin(vaultBin, key)
+            if (vaultDict == vaultDictWrong):
+                print('decrypt failed')
+            else:
+                print('decrypt success')
+                print('password:', password)
+                break
+        except LpParserFail as e:
+            print(e.msg, file=sys.stderr)
+            if _DEBUG:
+                raise e
+            else:
+                return e.errCode
     for code in recordFields:
         if vaultDict.get(code) and fileNames.get(code):
-            export_to_csv(vaultDict[code], recordFields[code], flags.outdir, fileNames[code])
+            export_to_csv(vaultDict[code], recordFields[code], output_dir, fileNames[code])
     print()
-    print('Data exported to {}'.format(os.path.abspath(flags.outdir)))
-    if not flags.nopause:
-        input('\npress ENTER to exit')
+    print('Data exported to {}'.format(os.path.abspath(output_dir)))
+    input('\npress ENTER to exit')
 
 class LpDecryptionError(Exception):
     pass
